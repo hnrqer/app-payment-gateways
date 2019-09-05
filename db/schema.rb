@@ -10,7 +10,15 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2019_09_05_000336) do
+ActiveRecord::Schema.define(version: 2019_09_05_001610) do
+
+  create_table "products", force: :cascade do |t|
+    t.string "name"
+    t.string "stripe_plan_name"
+    t.string "paypal_plan_name"
+    t.integer "price_cents", default: 0, null: false
+    t.string "price_currency", default: "USD", null: false
+  end
 
   create_table "users", force: :cascade do |t|
     t.string "email", default: "", null: false
