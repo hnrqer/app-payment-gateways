@@ -43,6 +43,7 @@ gem 'jquery-rails'
 gem 'money-rails'
 
 gem 'stripe-rails'
+gem 'paypal-sdk-rest'
 
 group :development, :test do
   # Call 'byebug' anywhere in the code to stop execution and get a debugger console
