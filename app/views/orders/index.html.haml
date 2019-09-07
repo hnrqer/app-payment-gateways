@@ -1,4 +1,5 @@
 =  stripe_javascript_tag
+%script(src="https://www.paypalobjects.com/api/checkout.js")
 
 %div
   %h1 List of products
@@ -58,7 +59,7 @@
     $form.submit();
   }
 
-  $(function initializePaymentGateways() {
+  (function setupStripe() {
     //Initialize stripe with publishable key
     var stripe = Stripe("#{ENV['STRIPE_PUBLISHABLE_KEY']}");
 
@@ -99,9 +100,21 @@
       });
       return false;
     });
+  }());
 
-    //YOUR PAYPAL CODE WILL BE HERE
-  });
+  (function setupPaypal() {
+    function isPayment() {
+      return $('[data-payment-section] input[name="orders[product_id]"]:checked').length
+    }
+    paypal.Button.render({
+      env: "#{ENV['PAYPAL_ENV']}",
+      payment: function(resolve, reject) {
+      },
+      onAuthorize: function(data) {
+      }
+    }, '#submit-paypal');
+  }());
+
 :css
   #card-element {
     width:500px;
