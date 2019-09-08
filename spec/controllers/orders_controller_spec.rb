@@ -115,25 +115,6 @@ RSpec.describe OrdersController, type: :controller do
           submit_order_and_check_failed
         end
       end
-      describe "purchase" do
-        let!(:product) { create(:product) }
-        it "performs order successfully" do
-          res = double(id: stripe_charge_id)
-          allow(Stripe::Charge).to receive(:create).and_return(res)
-          expect(Stripe::Charge).to receive(:create).with({
-            amount: product.price_cents.to_s,
-            currency: "usd",
-            description: product.name,
-            source: token
-          })
-          submit_order_and_check_success
-        end
-
-        it "fails if exception when stripe charge" do
-          allow(Stripe::Charge).to receive(:create).and_raise(Stripe::CardError.new(nil,nil))
-          submit_order_and_check_failed
-        end
-      end
 
       describe "plan" do
         let!(:product) { create(:product, :with_plan) }
