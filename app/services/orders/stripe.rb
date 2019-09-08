@@ -4,7 +4,7 @@ class Orders::Stripe
     product = order.product
     # Check if the order is a plan
     if product.stripe_plan_name.blank?
-      charge = self.execute_payment(price_cents: product.price_cents,
+      charge = self.execute_charge(price_cents: product.price_cents,
                                     description: product.name,
                                     card_token:  order.token)
     else
@@ -32,7 +32,7 @@ class Orders::Stripe
   end
 
   private
-  def self.execute_payment(price_cents:, description:, card_token:)
+  def self.execute_charge(price_cents:, description:, card_token:)
     Stripe::Charge.create({
       amount: price_cents.to_s,
       currency: "usd",

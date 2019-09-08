@@ -6,9 +6,9 @@
   = form_tag({:controller => "orders", :action => "submit" }, {:id => 'order-details'}) do
     %input{id:'order-type', :type=>"hidden", :value=>"stripe", :name=>'orders[payment_gateway]'}
     .form_row
-      %h4 Purchases
+      %h4 Charges/Payments
       - @products_purchase.each do |product|
-        %div{'data-payment-section': true}
+        %div{'data-charges-and-payments-section': true}
           = radio_button_tag 'orders[product_id]', product.id, @products_purchase.first == product
           %span{id: "radioButtonName#{product.id}"} #{product.name}
           %span{id: "radioButtonPrice#{product.id}", :'data-price' => "#{product.price_cents}"} #{humanized_money_with_symbol product.price}
@@ -21,7 +21,7 @@
           %span{id: "radioButtonPrice#{product.id}", :'data-price' => "#{product.price_cents}"} #{humanized_money_with_symbol product.price}
         %br
     %hr
-    %h1 Payment Selection
+    %h1 Payment Type Selection
     .form_row
       %div
         = radio_button_tag 'payment-selection', 'stripe', true, onclick: "changeTab();"
@@ -32,13 +32,13 @@
         %span Paypal
     %br
     %br
-    %div{id:'tab-stripe', class:'paymentTab activePaymentTab'}
+    %div{id:'tab-stripe', class:'paymentSelectionTab active'}
       %div{id:'card-element'}
       %div{id:'card-errors', role:"alert"}
       %br
       %br
       = submit_tag "Buy it!", id: "submit-stripe"
-    %div{id:'tab-paypal', class:'paymentTab'}
+    %div{id:'tab-paypal', class:'paymentSelectionTab'}
       %button{id: "submit-paypal"} Submit
     %br
     %br
@@ -46,8 +46,8 @@
 :javascript
   function changeTab() {
     var newActiveTabID = $('input[name="payment-selection"]:checked').val();
-    $('.paymentTab').removeClass('activePaymentTab');
-    $('#tab-' + newActiveTabID).addClass('activePaymentTab');
+    $('.paymentSelectionTab').removeClass('active');
+    $('#tab-' + newActiveTabID).addClass('active');
   }
 
   function submitOrder(orderType, token) {
@@ -104,7 +104,7 @@
 
   (function setupPaypal() {
     function isPayment() {
-      return $('[data-payment-section] input[name="orders[product_id]"]:checked').length
+      return $('[data-charges-and-payments-section] input[name="orders[product_id]"]:checked').length
     }
     paypal.Button.render({
       env: "#{ENV['PAYPAL_ENV']}",
@@ -127,7 +127,7 @@
             submitOrder('paypal', data.paymentID)
           });
         } else {
-          
+
         }
       }
     }, '#submit-paypal');
@@ -137,9 +137,9 @@
   #card-element {
     width:500px;
   }
-  .paymentTab {
+  .paymentSelectionTab {
     display: none;
   }
-  .activePaymentTab {
+  .paymentSelectionTab.active {
     display: block !important;
   }
