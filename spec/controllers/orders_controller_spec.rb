@@ -190,6 +190,7 @@ RSpec.describe OrdersController, type: :controller do
         end
       end
     end
+
     describe 'paypal' do
       let(:product) { create(:product) }
       let(:params)  { { orders: { product_id: product.id, token:  token, payment_gateway: 'paypal' } } }
@@ -307,6 +308,39 @@ RSpec.describe OrdersController, type: :controller do
           }
         end
       end
+      describe "#paypal_create_subsription" do
+        let!(:product) { create(:product , :with_plan) }
+        let(:action)   {:paypal_create_subscription}
+        def prepare(pass:)
+          res = double(token: token, create: pass)
+          allow(PayPal::SDK::REST::Agreement).to receive(:new).and_return(res)
+          expect(PayPal::SDK::REST::Agreement).to receive(:new).with(req_new_subscription(product))
+        end
+
+        describe "success" do
+          before(:each) { prepare(pass:true) }
+          it_behaves_like :paypal_create_ok
+        end
+
+        describe "failure" do
+          before(:each) { prepare(pass:false) }
+          it_behaves_like :paypal_create_fail
+        end
+
+        def req_new_subscription(product)
+          {
+            name: product.name,
+            description: "Subscription for: #{product.name}",
+            start_date: anything(),
+            payer: {
+              payment_method: "paypal"
+            },
+            plan: {
+              id: product.paypal_plan_name
+            }
+          }
+        end
+      end
     end
 
     describe "execute" do
@@ -366,6 +400,32 @@ RSpec.describe OrdersController, type: :controller do
 
         describe "failure - not found" do
           let(:orderToken) { params[:paymentID].reverse }
+          it_behaves_like :paypal_execute_not_found
+        end
+      end
+      describe "#paypal_execute_subscription" do
+        let!(:product) { create(:product, :with_plan) }
+        let(:action)   {:paypal_execute_subscription}
+        let(:params) { { paymentToken: 'payment-token' } }
+        def prepare(pass:)
+          res = OpenStruct.new(execute: pass)
+          allow(PayPal::SDK::REST::Agreement).to receive(:new).and_return(res)
+        end
+
+        describe "success" do
+          let(:orderToken) { params[:paymentToken] }
+          before(:each) { prepare(pass: true) }
+          it_behaves_like :paypal_execute_ok
+        end
+
+        describe "failure" do
+          let(:orderToken) { params[:paymentToken] }
+          before(:each) { prepare(pass: false) }
+          it_behaves_like :paypal_execute_fail
+        end
+
+        describe "failure - not found" do
+          let(:orderToken) { params[:paymentToken].reverse }
           it_behaves_like :paypal_execute_not_found
         end
       end

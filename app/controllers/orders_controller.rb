@@ -1,7 +1,7 @@
 class OrdersController < ApplicationController
-  protect_from_forgery :except => [:paypal_execute_payment]
-  before_action :authenticate_user!, except: [:paypal_execute_payment]
-  before_action :prepare_new_order, only: [:paypal_create_payment]
+  protect_from_forgery :except => [:paypal_execute_payment, :paypal_execute_subscription]
+  before_action :authenticate_user!, except: [:paypal_execute_payment, :paypal_execute_subscription]
+  before_action :prepare_new_order, only: [:paypal_create_payment, :paypal_create_subscription]
 
   SUCCESS_MESSAGE = 'Order Performed Successfully!'
   FAILURE_MESSAGE = 'Oops something went wrong. Please call the administrator'
@@ -43,6 +43,15 @@ class OrdersController < ApplicationController
     paypal_process_execute_order(options, &Orders::Paypal.method(:execute_payment))
   end
 
+  def paypal_create_subscription
+    paypal_process_create_order(&Orders::Paypal.method(:create_subscription))
+  end
+
+  def paypal_execute_subscription
+    options = {token: params[:paymentToken]}
+    paypal_process_execute_order(options, &Orders::Paypal.method(:execute_subscription))
+  end
+  
   private
   def paypal_process_execute_order(**options, &callback)
     @order = Orders::Paypal.find_order_by_token(options[:token])

@@ -115,7 +115,9 @@
             resolve(data.id);
           });
         } else {
-
+          return $.post("#{paypal_create_subscription_url}", $('#order-details').serialize()).then(function(data) {
+            resolve(data.id);
+          });
         }
       },
       onAuthorize: function(data) {
@@ -127,7 +129,9 @@
             submitOrder('paypal', data.paymentID)
           });
         } else {
-
+          return paypal.request.post("#{paypal_execute_subscription_url}", data).then(function() {
+            submitOrder('paypal', data.paymentToken)
+          });
         }
       }
     }, '#submit-paypal');
