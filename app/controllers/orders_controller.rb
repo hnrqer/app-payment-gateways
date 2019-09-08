@@ -1,5 +1,7 @@
 class OrdersController < ApplicationController
-  before_action :authenticate_user!
+  protect_from_forgery :except => [:paypal_execute_payment]
+  before_action :authenticate_user!, except: [:paypal_execute_payment]
+  before_action :prepare_new_order, only: [:paypal_create_payment]
 
   SUCCESS_MESSAGE = 'Order Performed Successfully!'
   FAILURE_MESSAGE = 'Oops something went wrong. Please call the administrator'
@@ -17,6 +19,7 @@ class OrdersController < ApplicationController
       prepare_new_order
       Orders::Stripe.execute(order: @order, user: current_user)
     elsif order_params[:payment_gateway] == "paypal"
+      @order = Orders::Paypal.execute(order_params[:token])
     end
   ensure
     if @order&.save
@@ -31,7 +34,42 @@ class OrdersController < ApplicationController
     render html: FAILURE_MESSAGE
   end
 
+  def paypal_create_payment
+    paypal_process_create_order(&Orders::Paypal.method(:create_payment))
+  end
+
+  def paypal_execute_payment
+    options = {token: params[:paymentID], payer_id: params[:payerID]}
+    paypal_process_execute_order(options, &Orders::Paypal.method(:execute_payment))
+  end
+
   private
+  def paypal_process_execute_order(**options, &callback)
+    @order = Orders::Paypal.find_order_by_token(options[:token])
+    if @order && callback.call(options)
+      @order.set_paypal_executed
+      render json: {}, status: :ok if @order.save
+    else
+      render json: {error: FAILURE_MESSAGE},
+        status: :unprocessable_entity
+    end
+  end
+
+  def paypal_process_create_order(&callback)
+    response = callback.call(product: @product)
+    if response[:success]
+      @order.token = response[:id]
+    else
+      @order.set_failed
+    end
+  ensure
+    if @order.save && @order.pending? && defined?(response) && !response.nil? && response.key?(:id)
+      render json: { id: response[:id] }, status: :ok
+    else
+      render json: {error: FAILURE_MESSAGE},
+        status: :unprocessable_entity
+    end
+  end
   # Initialize a new order and and set its user, product and price.
   def prepare_new_order
     @order = Order.new(order_params)

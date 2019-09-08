@@ -209,5 +209,185 @@ RSpec.describe OrdersController, type: :controller do
         end
       end
     end
+    describe 'paypal' do
+      let(:product) { create(:product) }
+      let(:params)  { { orders: { product_id: product.id, token:  token, payment_gateway: 'paypal' } } }
+      describe "Success" do
+        let!(:order) { create(:order, status: :paypal_executed, token: token) }
+        it "Performs order succesfully" do
+          post :submit, params: params
+          expect(response.body).to eq(OrdersController::SUCCESS_MESSAGE)
+          order.reload
+          expect(order.charge_id).to eq(token)
+          expect(order.paid?).to be_truthy
+        end
+      end
+
+      describe "Fails - if order is in incorrect state" do
+        let!(:order) { create(:order, status: :pending, token: token) }
+        it do
+          post :submit, params: params
+          expect(response.body).to eq(OrdersController::FAILURE_MESSAGE)
+          order.reload
+          expect(order.charge_id).to be_nil
+          expect(order.paid?).to be_falsy
+        end
+      end
+
+      describe "Fails - if order not found" do
+        let!(:order) { create(:order, status: :paypal_executed, token: token + 'a') }
+        it do
+          post :submit, params: params
+          expect(response.body).to eq(OrdersController::FAILURE_MESSAGE)
+          order.reload
+          expect(order.charge_id).to be_nil
+          expect(order.paid?).to be_falsy
+        end
+      end
+
+      after(:each) do
+        expect(response).to have_http_status(:ok)
+      end
+    end
+  end
+
+  describe "paypal" do
+    describe "create" do
+      let(:params)  {{ orders: { product_id: product.id, payment_gateway: 'paypal' }}}
+      shared_examples :paypal_create_ok do
+        it do
+          expect {
+            post action, params: params
+          }.to change(Order, :count).by(1)
+          order = Order.last
+          expect(response).to be_successful
+          expect(order.user).to eq(user)
+          expect(order.token).to eq(token)
+          expect(order.product).to eq(product)
+          expect(order.price_cents).to eq(product.price_cents)
+          expect(order.pending?).to be_truthy
+          expect(JSON.parse(response.body)["id"]).to eq(token)
+        end
+      end
+
+      shared_examples :paypal_create_fail do
+        it do
+          expect {
+            post action, params: params
+          }.to change(Order, :count).by(1)
+          order = Order.last
+          expect(response).to have_http_status(:unprocessable_entity)
+          expect(order.failed?).to be_truthy
+          expect(JSON.parse(response.body)["error"]).to be_present
+        end
+      end
+
+      describe "#paypal_create_payment" do
+        let!(:product) { create(:product) }
+        let(:action)   {:paypal_create_payment}
+        def prepare(pass:)
+          res = double(id: token, create: pass)
+          allow(PayPal::SDK::REST::Payment).to receive(:new).and_return(res)
+          expect(PayPal::SDK::REST::Payment).to receive(:new).with(req_new_payment(product))
+        end
+        describe "success" do
+          before(:each) { prepare(pass:true) }
+          it_behaves_like :paypal_create_ok
+        end
+        describe "failure" do
+          before(:each) { prepare(pass:false) }
+          it_behaves_like :paypal_create_fail
+        end
+
+        def req_new_payment(product, currency: "USD")
+          {
+            intent:  "sale",
+            payer:  {
+              payment_method: "paypal" },
+            redirect_urls: {
+              return_url: "/",
+              cancel_url: "/" },
+            transactions:  [{
+              item_list: {
+                items: [{
+                  name: product.name,
+                  sku: product.name,
+                  price: (product.price_cents/100.0).to_s,
+                  currency: currency,
+                  quantity: 1 }
+                  ]
+                },
+              amount: {
+                total: (product.price_cents/100.0).to_s,
+                currency: currency
+              },
+              description: "Payment for: #{product.name}"
+            }]
+          }
+        end
+      end
+    end
+
+    describe "execute" do
+      let!(:order) { create(:order) }
+      shared_examples :paypal_execute_ok do
+        it do
+          order.update(token: orderToken)
+          post action, params: params
+          expect(response).to be_successful
+          order.reload
+          expect(order.paypal_executed?).to be_truthy
+        end
+      end
+
+      shared_examples :paypal_execute_fail do
+        it do
+          order.update(token: orderToken)
+          post action, params: params
+          expect(response).to have_http_status(:unprocessable_entity)
+          expect(JSON.parse(response.body)["error"]).to be_present
+        end
+      end
+
+      shared_examples :paypal_execute_not_found do
+        it do
+          order.update(token: orderToken)
+          post action, params: params
+          expect(response).to have_http_status(:unprocessable_entity)
+          expect(JSON.parse(response.body)["error"]).to be_present
+          order.reload
+          expect(order.pending?).to be_truthy
+        end
+      end
+
+      describe "#paypal_execute_payment" do
+        let!(:product) { create(:product) }
+        let(:action)   {:paypal_execute_payment}
+        let(:params) { { paymentID: 'test-payment-id', payerID: 'test-payer-id' } }
+        def prepare(pass:)
+          res = double
+          allow(res).to receive(:execute).and_return(pass)
+          allow(PayPal::SDK::REST::Payment).to receive(:find).and_return(res)
+          expect(PayPal::SDK::REST::Payment).to receive(:find).with(params[:paymentID])
+        end
+
+        describe "success" do
+          let(:orderToken) { params[:paymentID] }
+          before(:each) { prepare(pass: true) }
+          it_behaves_like :paypal_execute_ok
+        end
+
+        describe "failure" do
+          let(:orderToken) { params[:paymentID] }
+          before(:each) { prepare(pass: false) }
+          it_behaves_like :paypal_execute_fail
+        end
+
+        describe "failure - not found" do
+          let(:orderToken) { params[:paymentID].reverse }
+          it_behaves_like :paypal_execute_not_found
+        end
+      end
+    end
   end
 end

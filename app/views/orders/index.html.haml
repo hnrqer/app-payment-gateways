@@ -109,8 +109,26 @@
     paypal.Button.render({
       env: "#{ENV['PAYPAL_ENV']}",
       payment: function(resolve, reject) {
+        $('#order-type').val("paypal");
+        if (isPayment()) {
+          return $.post("#{paypal_create_payment_url}", $('#order-details').serialize()).then(function(data) {
+            resolve(data.id);
+          });
+        } else {
+
+        }
       },
       onAuthorize: function(data) {
+        if (isPayment()) {
+          return paypal.request.post("#{paypal_execute_payment_url}", {
+            paymentID: data.paymentID,
+            payerID:   data.payerID
+          }).then(function() {
+            submitOrder('paypal', data.paymentID)
+          });
+        } else {
+          
+        }
       }
     }, '#submit-paypal');
   }());
