@@ -22,13 +22,13 @@ class Orders::Stripe
     unless charge&.id.blank?
       # If there is a charge with id, set order paid.
       order.charge_id = charge.id
-      order.status = Order.statuses[:paid]
+      order.set_paid
     end
   rescue Stripe::StripeError => e
     # If a Stripe error is raised from the API,
     # set status failed and an error message
-    order.status = Order.statuses[:failed]
     order.error_message = INVALID_STRIPE_OPERATION
+    order.set_failed
   end
 
   private
