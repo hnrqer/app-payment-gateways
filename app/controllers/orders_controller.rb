@@ -52,17 +52,18 @@ class OrdersController < ApplicationController
   end
 
   private
-  def paypal_process_execute_order(**options, &callback)
-    @order = Orders::Paypal.find_order_by_token(options[:token])
-    if @order && callback.call(options)
-      @order.set_paypal_executed
-      render json: {}, status: :ok if @order.save
-    else
-      render json: {error: FAILURE_MESSAGE},
-        status: :unprocessable_entity
-    end
+  # Initialize a new order and and set its user, product and price.
+  def prepare_new_order
+    @order = Order.new(order_params)
+    @order.user_id = current_user.id
+    @product = Product.find(@order.product_id)
+    @order.price_cents = @product.price_cents
   end
 
+  def order_params
+    params.require(:orders).permit(:product_id, :token, :payment_gateway)
+  end
+  
   def paypal_process_create_order(&callback)
     response = callback.call(product: @product)
     if response[:success]
@@ -78,15 +79,15 @@ class OrdersController < ApplicationController
         status: :unprocessable_entity
     end
   end
-  # Initialize a new order and and set its user, product and price.
-  def prepare_new_order
-    @order = Order.new(order_params)
-    @order.user_id = current_user.id
-    @product = Product.find(@order.product_id)
-    @order.price_cents = @product.price_cents
-  end
 
-  def order_params
-    params.require(:orders).permit(:product_id, :token, :payment_gateway)
+  def paypal_process_execute_order(**options, &callback)
+    @order = Orders::Paypal.find_order_by_token(options[:token])
+    if @order && callback.call(options)
+      @order.set_paypal_executed
+      render json: {}, status: :ok if @order.save
+    else
+      render json: {error: FAILURE_MESSAGE},
+        status: :unprocessable_entity
+    end
   end
 end
