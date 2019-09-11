@@ -1,6 +1,5 @@
 class OrdersController < ApplicationController
-  protect_from_forgery :except => [:paypal_execute_payment, :paypal_execute_subscription]
-  before_action :authenticate_user!, except: [:paypal_execute_payment, :paypal_execute_subscription]
+  before_action :authenticate_user!
   before_action :prepare_new_order, only: [:paypal_create_payment, :paypal_create_subscription]
 
   SUCCESS_MESSAGE = 'Order Performed Successfully!'
@@ -51,7 +50,7 @@ class OrdersController < ApplicationController
     options = {token: params[:paymentToken]}
     paypal_process_execute_order(options, &Orders::Paypal.method(:execute_subscription))
   end
-  
+
   private
   def paypal_process_execute_order(**options, &callback)
     @order = Orders::Paypal.find_order_by_token(options[:token])

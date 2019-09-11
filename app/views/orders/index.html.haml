@@ -21,7 +21,7 @@
           %span{id: "radioButtonPrice#{product.id}", :'data-price' => "#{product.price_cents}"} #{humanized_money_with_symbol product.price}
         %br
     %hr
-    %h1 Payment Type Selection
+    %h1 Payment Method
     .form_row
       %div
         = radio_button_tag 'payment-selection', 'stripe', true, onclick: "changeTab();"
@@ -122,14 +122,14 @@
       },
       onAuthorize: function(data) {
         if (isPayment()) {
-          return paypal.request.post("#{paypal_execute_payment_url}", {
+          return $.post("#{paypal_execute_payment_url}", {
             paymentID: data.paymentID,
             payerID:   data.payerID
           }).then(function() {
             submitOrder('paypal', data.paymentID)
           });
         } else {
-          return paypal.request.post("#{paypal_execute_subscription_url}", data).then(function() {
+          return $.post("#{paypal_execute_subscription_url}", data).then(function() {
             submitOrder('paypal', data.paymentToken)
           });
         }
