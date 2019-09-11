@@ -49,11 +49,6 @@ class Orders::Paypal
     payment.execute( payer_id: payer_id )
   end
 
-  def self.execute_payment(token:, payer_id:)
-    payment = PayPal::SDK::REST::Payment.find(token)
-    payment.execute( payer_id: payer_id )
-  end
-
   def self.create_subscription(product:)
     agreement =  PayPal::SDK::REST::Agreement.new({
       name: product.name,
