@@ -18,7 +18,7 @@ class OrdersController < ApplicationController
       prepare_new_order
       Orders::Stripe.execute(order: @order, user: current_user)
     elsif order_params[:payment_gateway] == "paypal"
-      @order = Orders::Paypal.execute(order_params[:token])
+      @order = Orders::Paypal.execute(order_params[:charge_id])
     end
   ensure
     if @order&.save
@@ -43,7 +43,7 @@ class OrdersController < ApplicationController
   end
 
   def paypal_execute_payment
-    if Orders::Paypal.execute_payment(token: params[:paymentID], payer_id: params[:payerID])
+    if Orders::Paypal.execute_payment(payment_id: params[:paymentID], payer_id: params[:payerID])
       render json: {}, status: :ok
     else
       render json: {error: FAILURE_MESSAGE}, status: :unprocessable_entity
@@ -60,8 +60,9 @@ class OrdersController < ApplicationController
   end
 
   def paypal_execute_subscription
-    if Orders::Paypal.execute_subscription(token: params[:paymentToken])
-      render json: {}, status: :ok
+    result = Orders::Paypal.execute_subscription(token: params[:paymentToken])
+    if result
+      render json: { id: result}, status: :ok
     else
       render json: {error: FAILURE_MESSAGE}, status: :unprocessable_entity
     end
@@ -77,6 +78,6 @@ class OrdersController < ApplicationController
   end
 
   def order_params
-    params.require(:orders).permit(:product_id, :token, :payment_gateway)
+    params.require(:orders).permit(:product_id, :token, :payment_gateway, :charge_id)
   end
 end

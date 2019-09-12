@@ -50,15 +50,6 @@
     $('#tab-' + newActiveTabID).addClass('active');
   }
 
-  function submitOrder(orderType, token) {
-    var $form = $("#order-details");
-    // Add a hidden input orders[token]
-    $form.append($('<input type="hidden" name="orders[token]"/>').val(token));
-    // Set order type
-    $('#order-type').val(orderType);
-    $form.submit();
-  }
-
   (function setupStripe() {
     //Initialize stripe with publishable key
     var stripe = Stripe("#{ENV['STRIPE_PUBLISHABLE_KEY']}");
@@ -95,7 +86,12 @@
           errorElement.textContent = result.error.message;
         } else {
           // Submits the order
-          submitOrder('stripe', result.token.id)
+          var $form = $("#order-details");
+          // Add a hidden input orders[token]
+          $form.append($('<input type="hidden" name="orders[token]"/>').val(result.token.id));
+          // Set order type
+          $('#order-type').val('stripe');
+          $form.submit();
         }
       });
       return false;
@@ -106,6 +102,16 @@
     function isPayment() {
       return $('[data-charges-and-payments-section] input[name="orders[product_id]"]:checked').length
     }
+
+    function submitOrderPaypal(chargeID) {
+      var $form = $("#order-details");
+      // Add a hidden input orders[charge_id]
+      $form.append($('<input type="hidden" name="orders[charge_id]"/>').val(chargeID));
+      // Set order type
+      $('#order-type').val('paypal');
+      $form.submit();
+    }
+
     paypal.Button.render({
       env: "#{ENV['PAYPAL_ENV']}",
       payment: function(resolve, reject) {
@@ -126,11 +132,11 @@
             paymentID: data.paymentID,
             payerID:   data.payerID
           }).then(function() {
-            submitOrder('paypal', data.paymentID)
+            submitOrderPaypal(data.paymentID)
           });
         } else {
-          return $.post("#{paypal_execute_subscription_url}", data).then(function() {
-            submitOrder('paypal', data.paymentToken)
+          return $.post("#{paypal_execute_subscription_url}", data).then(function(executeData) {
+            submitOrderPaypal(executeData.id)
           });
         }
       }

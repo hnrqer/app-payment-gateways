@@ -1,9 +1,7 @@
 class Orders::Paypal
-  def self.execute(token)
-    order = Order.paypal_executed.where(token: token).last
+  def self.execute(charge_id)
+    order = Order.paypal_executed.recently_created.find_by(charge_id: charge_id)
     return nil if order.nil?
-    order.charge_id = order.token
-    order.token = nil
     order.set_paid
     order
   end
@@ -36,15 +34,16 @@ class Orders::Paypal
       }]
     })
     if payment.create
-      order.token = payment.id
+      order.token = payment.token
+      order.charge_id = payment.id
       return payment.id if order.save
     end
   end
 
-  def self.execute_payment(token:, payer_id:)
-    order = Order.find_by(token: token)
+  def self.execute_payment(payment_id:, payer_id:)
+    order = Order.recently_created.find_by(charge_id: payment_id)
     return false unless order
-    payment = PayPal::SDK::REST::Payment.find(token)
+    payment = PayPal::SDK::REST::Payment.find(payment_id)
     if payment.execute( payer_id: payer_id )
       order.set_paypal_executed
       return order.save
@@ -70,13 +69,14 @@ class Orders::Paypal
   end
 
   def self.execute_subscription(token:)
-    order = Order.find_by(token: token)
+    order = Order.recently_created.find_by(token: token)
     return false unless order
     agreement = PayPal::SDK::REST::Agreement.new
     agreement.token = token
     if agreement.execute
+      order.charge_id = agreement.id
       order.set_paypal_executed
-      return order.save
+      return order.charge_id if order.save
     end
   end
 end

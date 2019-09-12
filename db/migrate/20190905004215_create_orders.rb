@@ -9,7 +9,7 @@ class CreateOrders < ActiveRecord::Migration[5.2]
       t.string :error_message
       t.string :customer_id
       t.integer :payment_gateway
-      t.string :timestamps
+      t.timestamps
     end
     add_money :orders, :price, currency: { present: false }
   end

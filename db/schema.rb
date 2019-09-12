@@ -21,7 +21,8 @@ ActiveRecord::Schema.define(version: 2019_09_07_202923) do
     t.string "error_message"
     t.string "customer_id"
     t.integer "payment_gateway"
-    t.string "timestamps"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
     t.integer "price_cents", default: 0, null: false
   end
 

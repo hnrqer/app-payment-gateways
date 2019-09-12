@@ -4,6 +4,7 @@ RSpec.describe OrdersController, type: :controller do
   include Devise::Test::ControllerHelpers
   let(:user) { create(:user) }
   let(:token)    { "ToKeN1!2@3#" }
+  let(:paypal_charge_id) {"PAYID123456789"}
   before(:each) do
     sign_in(user)
   end
@@ -200,29 +201,26 @@ RSpec.describe OrdersController, type: :controller do
           post :submit, params: params
           expect(response.body).to eq(OrdersController::SUCCESS_MESSAGE)
           order.reload
-          expect(order.charge_id).to eq(token)
           expect(order.paid?).to be_truthy
         end
       end
 
       describe "Fails - if order is in incorrect state" do
-        let!(:order) { create(:order, status: :pending, token: token) }
+        let!(:order) { create(:order, status: :pending, charge_id: paypal_charge_id) }
         it do
           post :submit, params: params
           expect(response.body).to eq(OrdersController::FAILURE_MESSAGE)
           order.reload
-          expect(order.charge_id).to be_nil
           expect(order.paid?).to be_falsy
         end
       end
 
       describe "Fails - if order not found" do
-        let!(:order) { create(:order, status: :paypal_executed, token: token + 'a') }
+        let!(:order) { create(:order, status: :paypal_executed, charge_id: paypal_charge_id + 'a') }
         it do
           post :submit, params: params
           expect(response.body).to eq(OrdersController::FAILURE_MESSAGE)
           order.reload
-          expect(order.charge_id).to be_nil
           expect(order.paid?).to be_falsy
         end
       end
@@ -248,7 +246,12 @@ RSpec.describe OrdersController, type: :controller do
           expect(order.product).to eq(product)
           expect(order.price_cents).to eq(product.price_cents)
           expect(order.pending?).to be_truthy
-          expect(JSON.parse(response.body)["id"]).to eq(token)
+          if order.product.paypal_plan_name.blank?
+            expect(order.charge_id).to eq(paypal_charge_id)
+            expect(JSON.parse(response.body)["id"]).to eq(paypal_charge_id)
+          else
+            expect(JSON.parse(response.body)["id"]).to eq(token)
+          end
         end
       end
 
@@ -266,13 +269,16 @@ RSpec.describe OrdersController, type: :controller do
         let!(:product) { create(:product) }
         let(:action)   {:paypal_create_payment}
         def prepare(pass:)
-          res = double(id: token, create: pass)
+          res = double(id: paypal_charge_id, token: token, create: pass)
           allow(PayPal::SDK::REST::Payment).to receive(:new).and_return(res)
           expect(PayPal::SDK::REST::Payment).to receive(:new).with(req_new_payment(product))
         end
         describe "success" do
           before(:each) { prepare(pass:true) }
           it_behaves_like :paypal_create_ok
+          after do
+
+          end
         end
         describe "failure" do
           before(:each) { prepare(pass:false) }
@@ -306,7 +312,7 @@ RSpec.describe OrdersController, type: :controller do
           }
         end
       end
-      describe "#paypal_create_subsription" do
+      describe "#paypal_create_subscription" do
         let!(:product) { create(:product , :with_plan) }
         let(:action)   {:paypal_create_subscription}
         def prepare(pass:)
@@ -345,17 +351,19 @@ RSpec.describe OrdersController, type: :controller do
       let!(:order) { create(:order) }
       shared_examples :paypal_execute_ok do
         it do
-          order.update(token: orderToken)
           post action, params: params
           expect(response).to be_successful
           order.reload
           expect(order.paypal_executed?).to be_truthy
+          unless order.product.paypal_plan_name.blank?
+            expect(order.charge_id).to eq(paypal_charge_id)
+            expect(JSON.parse(response.body)["id"]).to eq(paypal_charge_id)
+          end
         end
       end
 
       shared_examples :paypal_execute_fail do
         it do
-          order.update(token: orderToken)
           post action, params: params
           expect(response).to have_http_status(:unprocessable_entity)
           expect(JSON.parse(response.body)["error"]).to be_present
@@ -364,7 +372,6 @@ RSpec.describe OrdersController, type: :controller do
 
       shared_examples :paypal_execute_not_found do
         it do
-          order.update(token: orderToken)
           post action, params: params
           expect(response).to have_http_status(:unprocessable_entity)
           expect(JSON.parse(response.body)["error"]).to be_present
@@ -376,54 +383,62 @@ RSpec.describe OrdersController, type: :controller do
       describe "#paypal_execute_payment" do
         let!(:product) { create(:product) }
         let(:action)   {:paypal_execute_payment}
-        let(:params) { { paymentID: 'test-payment-id', payerID: 'test-payer-id' } }
+        let(:params) { { paymentID: paypal_charge_id, payerID: 'test-payer-id' } }
         def prepare(pass:)
           res = double
           allow(res).to receive(:execute).and_return(pass)
           allow(PayPal::SDK::REST::Payment).to receive(:find).and_return(res)
-          expect(PayPal::SDK::REST::Payment).to receive(:find).with(params[:paymentID])
+          expect(PayPal::SDK::REST::Payment).to receive(:find).with(paypal_charge_id)
+          expect(res).to receive(:execute).with(payer_id: params[:payerID])
         end
 
         describe "success" do
-          let(:orderToken) { params[:paymentID] }
-          before(:each) { prepare(pass: true) }
+          before do
+            order.update(charge_id: paypal_charge_id)
+            prepare(pass: true)
+          end
           it_behaves_like :paypal_execute_ok
         end
 
         describe "failure" do
-          let(:orderToken) { params[:paymentID] }
-          before(:each) { prepare(pass: false) }
+          before do
+            order.update(charge_id: paypal_charge_id)
+            prepare(pass: false)
+          end
           it_behaves_like :paypal_execute_fail
         end
 
         describe "failure - not found" do
-          let(:orderToken) { params[:paymentID].reverse }
           it_behaves_like :paypal_execute_not_found
         end
       end
       describe "#paypal_execute_subscription" do
         let!(:product) { create(:product, :with_plan) }
         let(:action)   {:paypal_execute_subscription}
-        let(:params) { { paymentToken: 'payment-token' } }
+        let(:params) { { paymentToken: token } }
         def prepare(pass:)
-          res = OpenStruct.new(execute: pass)
+          res = OpenStruct.new(execute: pass, id: paypal_charge_id)
           allow(PayPal::SDK::REST::Agreement).to receive(:new).and_return(res)
         end
 
         describe "success" do
-          let(:orderToken) { params[:paymentToken] }
-          before(:each) { prepare(pass: true) }
+          before do
+            order.update(token: token)
+            prepare(pass: true)
+          end
           it_behaves_like :paypal_execute_ok
         end
 
         describe "failure" do
-          let(:orderToken) { params[:paymentToken] }
-          before(:each) { prepare(pass: false) }
+          before do
+            order.update(token: token)
+            prepare(pass: false)
+          end
           it_behaves_like :paypal_execute_fail
         end
 
         describe "failure - not found" do
-          let(:orderToken) { params[:paymentToken].reverse }
+          before { order.update(token: token.reverse) }
           it_behaves_like :paypal_execute_not_found
         end
       end
