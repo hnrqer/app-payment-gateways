@@ -256,10 +256,8 @@ RSpec.describe OrdersController, type: :controller do
         it do
           expect {
             post action, params: params
-          }.to change(Order, :count).by(1)
-          order = Order.last
+          }.to change(Order, :count).by(0)
           expect(response).to have_http_status(:unprocessable_entity)
-          expect(order.failed?).to be_truthy
           expect(JSON.parse(response.body)["error"]).to be_present
         end
       end

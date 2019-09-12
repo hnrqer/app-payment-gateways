@@ -8,11 +8,7 @@ class Orders::Paypal
     order
   end
 
-  def self.find_order_by_token(token)
-    Order.find_by(token: token)
-  end
-
-  def self.create_payment(product:)
+  def self.create_payment(order:, product:)
     payment_price = (product.price_cents/100.0).to_s
     currency = "USD"
     payment = PayPal::SDK::REST::Payment.new({
@@ -39,17 +35,23 @@ class Orders::Paypal
         description:  "Payment for: #{product.name}"
       }]
     })
-    result = payment.create
-    id = result ? payment.id : nil
-    return {success: result, id: payment.id}
+    if payment.create
+      order.token = payment.id
+      return payment.id if order.save
+    end
   end
 
   def self.execute_payment(token:, payer_id:)
+    order = Order.find_by(token: token)
+    return false unless order
     payment = PayPal::SDK::REST::Payment.find(token)
-    payment.execute( payer_id: payer_id )
+    if payment.execute( payer_id: payer_id )
+      order.set_paypal_executed
+      return order.save
+    end
   end
 
-  def self.create_subscription(product:)
+  def self.create_subscription(order:, product:)
     agreement =  PayPal::SDK::REST::Agreement.new({
       name: product.name,
       description: "Subscription for: #{product.name}",
@@ -61,13 +63,20 @@ class Orders::Paypal
         id: product.paypal_plan_name
       }
     })
-    result = agreement.create
-    return {success: result, id: agreement.token}
+    if agreement.create
+      order.token = agreement.token
+      return agreement.token if order.save
+    end
   end
 
   def self.execute_subscription(token:)
+    order = Order.find_by(token: token)
+    return false unless order
     agreement = PayPal::SDK::REST::Agreement.new
     agreement.token = token
-    agreement.execute
+    if agreement.execute
+      order.set_paypal_executed
+      return order.save
+    end
   end
 end

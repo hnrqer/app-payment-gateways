@@ -34,21 +34,37 @@ class OrdersController < ApplicationController
   end
 
   def paypal_create_payment
-    paypal_process_create_order(&Orders::Paypal.method(:create_payment))
+    result = Orders::Paypal.create_payment(order: @order, product: @product)
+    if result
+      render json: { id: result }, status: :ok
+    else
+      render json: {error: FAILURE_MESSAGE}, status: :unprocessable_entity
+    end
   end
 
   def paypal_execute_payment
-    options = {token: params[:paymentID], payer_id: params[:payerID]}
-    paypal_process_execute_order(options, &Orders::Paypal.method(:execute_payment))
+    if Orders::Paypal.execute_payment(token: params[:paymentID], payer_id: params[:payerID])
+      render json: {}, status: :ok
+    else
+      render json: {error: FAILURE_MESSAGE}, status: :unprocessable_entity
+    end
   end
 
   def paypal_create_subscription
-    paypal_process_create_order(&Orders::Paypal.method(:create_subscription))
+    result = Orders::Paypal.create_subscription(order: @order, product: @product)
+    if result
+      render json: { id: result }, status: :ok
+    else
+      render json: {error: FAILURE_MESSAGE}, status: :unprocessable_entity
+    end
   end
 
   def paypal_execute_subscription
-    options = {token: params[:paymentToken]}
-    paypal_process_execute_order(options, &Orders::Paypal.method(:execute_subscription))
+    if Orders::Paypal.execute_subscription(token: params[:paymentToken])
+      render json: {}, status: :ok
+    else
+      render json: {error: FAILURE_MESSAGE}, status: :unprocessable_entity
+    end
   end
 
   private
@@ -62,32 +78,5 @@ class OrdersController < ApplicationController
 
   def order_params
     params.require(:orders).permit(:product_id, :token, :payment_gateway)
-  end
-  
-  def paypal_process_create_order(&callback)
-    response = callback.call(product: @product)
-    if response[:success]
-      @order.token = response[:id]
-    else
-      @order.set_failed
-    end
-  ensure
-    if @order.save && @order.pending? && defined?(response) && !response.nil? && response.key?(:id)
-      render json: { id: response[:id] }, status: :ok
-    else
-      render json: {error: FAILURE_MESSAGE},
-        status: :unprocessable_entity
-    end
-  end
-
-  def paypal_process_execute_order(**options, &callback)
-    @order = Orders::Paypal.find_order_by_token(options[:token])
-    if @order && callback.call(options)
-      @order.set_paypal_executed
-      render json: {}, status: :ok if @order.save
-    else
-      render json: {error: FAILURE_MESSAGE},
-        status: :unprocessable_entity
-    end
   end
 end
