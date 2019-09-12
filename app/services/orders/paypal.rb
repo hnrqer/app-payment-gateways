@@ -1,5 +1,5 @@
 class Orders::Paypal
-  def self.execute(charge_id)
+  def self.finish(charge_id)
     order = Order.paypal_executed.recently_created.find_by(charge_id: charge_id)
     return nil if order.nil?
     order.set_paid

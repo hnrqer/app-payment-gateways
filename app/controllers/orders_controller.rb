@@ -18,7 +18,7 @@ class OrdersController < ApplicationController
       prepare_new_order
       Orders::Stripe.execute(order: @order, user: current_user)
     elsif order_params[:payment_gateway] == "paypal"
-      @order = Orders::Paypal.execute(order_params[:charge_id])
+      @order = Orders::Paypal.finish(order_params[:charge_id])
     end
   ensure
     if @order&.save
