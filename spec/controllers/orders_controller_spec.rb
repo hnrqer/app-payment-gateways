@@ -91,9 +91,9 @@ RSpec.describe OrdersController, type: :controller do
         expect(order.charge_id).to eq(stripe_charge_id)
         user.reload
         if (check_customer_id)
-          expect(user.customer_id).to eq(new_customer_id)
+          expect(user.stripe_customer_id).to eq(new_customer_id)
         else
-          expect(user.customer_id).to eq(nil)
+          expect(user.stripe_customer_id).to eq(nil)
         end
       end
 
@@ -152,10 +152,10 @@ RSpec.describe OrdersController, type: :controller do
         end
 
         describe "with customer" do
-          before(:each) { user.update(customer_id: 'stripe-customer-id') }
+          before(:each) { user.update(stripe_customer_id: 'stripe-customer-id') }
           it "performs order successfully" do
             allow(Stripe::Customer).to receive(:retrieve).and_return(res_customer)
-            expect(Stripe::Customer).to receive(:retrieve).with({ id: user.customer_id })
+            expect(Stripe::Customer).to receive(:retrieve).with({ id: user.stripe_customer_id })
             allow(Stripe::Customer).to receive(:update).and_return(res_customer)
             expect(Stripe::Customer).to receive(:update).with(new_customer_id, { source: token })
             allow(res_subscription_create).to receive(:create).and_return(res_subscription_create)
@@ -167,19 +167,19 @@ RSpec.describe OrdersController, type: :controller do
 
           it "fails if customer retrieve fail" do
             allow(Stripe::Customer).to receive(:retrieve).and_raise(Stripe::CardError.new(nil,nil))
-            expect(Stripe::Customer).to receive(:retrieve).with({ id: user.customer_id })
+            expect(Stripe::Customer).to receive(:retrieve).with({ id: user.stripe_customer_id })
             submit_order_and_check_failed
           end
           it "fails if customer update fail" do
             allow(Stripe::Customer).to receive(:retrieve).and_return(res_customer)
-            expect(Stripe::Customer).to receive(:retrieve).with({ id: user.customer_id })
+            expect(Stripe::Customer).to receive(:retrieve).with({ id: user.stripe_customer_id })
             allow(Stripe::Customer).to receive(:update).and_raise(Stripe::CardError.new(nil,nil))
             expect(Stripe::Customer).to receive(:update).with(new_customer_id, { source: token })
             submit_order_and_check_failed
           end
           it "fails if customer subscription create fail" do
             allow(Stripe::Customer).to receive(:retrieve).and_return(res_customer)
-            expect(Stripe::Customer).to receive(:retrieve).with({ id: user.customer_id })
+            expect(Stripe::Customer).to receive(:retrieve).with({ id: user.stripe_customer_id })
             allow(Stripe::Customer).to receive(:update).and_return(res_customer)
             expect(Stripe::Customer).to receive(:update).with(new_customer_id, { source: token })
             allow(res_subscription_create).to receive(:create).and_raise(Stripe::CardError.new(nil,nil))

@@ -9,10 +9,10 @@ class Orders::Stripe
                                     card_token:  order.token)
     else
       customer =  self.find_or_create_customer(card_token: order.token,
-                                               customer_id: user.customer_id,
+                                               customer_id: user.stripe_customer_id,
                                                email: user.email)
       if customer
-        user.update(customer_id: customer.id)
+        user.update(stripe_customer_id: customer.id)
         order.customer_id = customer.id
         charge = self.execute_subscription(plan: product.stripe_plan_name,
                                            token: order.token,
