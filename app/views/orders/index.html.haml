@@ -135,7 +135,9 @@
             submitOrderPaypal(data.paymentID)
           });
         } else {
-          return $.post("#{paypal_execute_subscription_url}", data).then(function(executeData) {
+          return $.post("#{paypal_execute_subscription_url}", {
+            paymentToken: data.paymentToken
+          }).then(function(executeData) {
             submitOrderPaypal(executeData.id)
           });
         }
