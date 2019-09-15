@@ -36,7 +36,7 @@ class OrdersController < ApplicationController
   def paypal_create_payment
     result = Orders::Paypal.create_payment(order: @order, product: @product)
     if result
-      render json: { id: result }, status: :ok
+      render json: { token: result }, status: :ok
     else
       render json: {error: FAILURE_MESSAGE}, status: :unprocessable_entity
     end
@@ -53,14 +53,14 @@ class OrdersController < ApplicationController
   def paypal_create_subscription
     result = Orders::Paypal.create_subscription(order: @order, product: @product)
     if result
-      render json: { id: result }, status: :ok
+      render json: { token: result }, status: :ok
     else
       render json: {error: FAILURE_MESSAGE}, status: :unprocessable_entity
     end
   end
 
   def paypal_execute_subscription
-    result = Orders::Paypal.execute_subscription(token: params[:paymentToken])
+    result = Orders::Paypal.execute_subscription(token: params[:subscriptionToken])
     if result
       render json: { id: result}, status: :ok
     else

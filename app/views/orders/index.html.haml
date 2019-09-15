@@ -1,5 +1,5 @@
 =  stripe_javascript_tag
-%script(src="https://www.paypalobjects.com/api/checkout.js")
+%script(src="https://www.paypal.com/sdk/js?client-id=#{ENV['PAYPAL_CLIENT_ID']}")
 
 %div
   %h1 List of products
@@ -39,7 +39,7 @@
       %br
       = submit_tag "Buy it!", id: "submit-stripe"
     %div{id:'tab-paypal', class:'paymentSelectionTab'}
-      %button{id: "submit-paypal"} Submit
+      %div{id: "submit-paypal"}
     %br
     %br
     %hr
@@ -112,21 +112,21 @@
       $form.submit();
     }
 
-    paypal.Button.render({
+    paypal.Buttons({
       env: "#{ENV['PAYPAL_ENV']}",
-      payment: function(resolve, reject) {
+      createOrder: function() {
         $('#order-type').val("paypal");
         if (isPayment()) {
           return $.post("#{paypal_create_payment_url}", $('#order-details').serialize()).then(function(data) {
-            resolve(data.id);
+            return data.token;
           });
         } else {
           return $.post("#{paypal_create_subscription_url}", $('#order-details').serialize()).then(function(data) {
-            resolve(data.id);
+            return data.token;
           });
         }
       },
-      onAuthorize: function(data) {
+      onApprove: function(data) {
         if (isPayment()) {
           return $.post("#{paypal_execute_payment_url}", {
             paymentID: data.paymentID,
@@ -136,13 +136,13 @@
           });
         } else {
           return $.post("#{paypal_execute_subscription_url}", {
-            paymentToken: data.paymentToken
+            subscriptionToken: data.orderID
           }).then(function(executeData) {
             submitOrderPaypal(executeData.id)
           });
         }
       }
-    }, '#submit-paypal');
+    }).render('#submit-paypal');
   }());
 
 :css

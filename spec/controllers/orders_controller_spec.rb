@@ -246,11 +246,9 @@ RSpec.describe OrdersController, type: :controller do
           expect(order.product).to eq(product)
           expect(order.price_cents).to eq(product.price_cents)
           expect(order.pending?).to be_truthy
+          expect(JSON.parse(response.body)["token"]).to eq(token)
           if order.product.paypal_plan_name.blank?
             expect(order.charge_id).to eq(paypal_charge_id)
-            expect(JSON.parse(response.body)["id"]).to eq(paypal_charge_id)
-          else
-            expect(JSON.parse(response.body)["id"]).to eq(token)
           end
         end
       end
@@ -415,7 +413,7 @@ RSpec.describe OrdersController, type: :controller do
       describe "#paypal_execute_subscription" do
         let!(:product) { create(:product, :with_plan) }
         let(:action)   {:paypal_execute_subscription}
-        let(:params) { { paymentToken: token } }
+        let(:params) { { subscriptionToken: token } }
         def prepare(pass:)
           res = OpenStruct.new(execute: pass, id: paypal_charge_id)
           allow(PayPal::SDK::REST::Agreement).to receive(:new).and_return(res)

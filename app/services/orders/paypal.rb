@@ -36,7 +36,7 @@ class Orders::Paypal
     if payment.create
       order.token = payment.token
       order.charge_id = payment.id
-      return payment.id if order.save
+      return payment.token if order.save
     end
   end
 
