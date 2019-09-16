@@ -11,11 +11,9 @@ class Orders::Stripe
       customer =  self.find_or_create_customer(card_token: order.token,
                                                customer_id: user.stripe_customer_id,
                                                email: user.email)
-      if customer
-        user.update(stripe_customer_id: customer.id)
+      if customer and user.update(stripe_customer_id: customer.id)
         order.customer_id = customer.id
         charge = self.execute_subscription(plan: product.stripe_plan_name,
-                                           token: order.token,
                                            customer: customer)
       end
     end
@@ -41,7 +39,7 @@ class Orders::Stripe
     })
   end
 
-  def self.execute_subscription(plan:, token:, customer:)
+  def self.execute_subscription(plan:, customer:)
     customer.subscriptions.create({
       plan: plan
     })
